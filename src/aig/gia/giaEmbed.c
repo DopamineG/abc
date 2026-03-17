@@ -1779,6 +1779,66 @@ void Emb_ManDumpGnuplot( Emb_Man_t * p, char * pName, int fDumpLarge, int fShowI
 
 /**Function*************************************************************
 
+  Synopsis    [Dumps placement coordinates for each object.]
+
+  Description [Writes one line per GIA object into a text file.]
+               
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+void Gia_ManDumpPlacement( Gia_Man_t * pGia, char * pName )
+{
+    Gia_Obj_t * pObj;
+    FILE * pFile;
+    char Buffer[1000];
+    char * pObjName;
+    char * pType;
+    int i;
+    if ( pGia->pPlacement == NULL )
+    {
+        printf( "Gia_ManDumpPlacement(): Placement is not available.\n" );
+        return;
+    }
+    sprintf( Buffer, "%s", Gia_FileNameGenericAppend(pName, ".csv") );
+    pFile = fopen( Buffer, "w" );
+    if ( pFile == NULL )
+    {
+        printf( "Gia_ManDumpPlacement(): Cannot open output file \"%s\".\n", Buffer );
+        return;
+    }
+    fprintf( pFile, "id,type,x,y,name\n" );
+    Gia_ManForEachObj( pGia, pObj, i )
+    {
+        pObjName = NULL;
+        if ( Gia_ObjIsConst0(pObj) )
+            pType = "const0";
+        else if ( Gia_ObjIsCi(pObj) )
+        {
+            pType = Gia_ObjIsRo(pGia, pObj) ? "ro" : "pi";
+            pObjName = Gia_ObjCiName( pGia, Gia_ObjCioId(pObj) );
+        }
+        else if ( Gia_ObjIsCo(pObj) )
+        {
+            pType = Gia_ObjIsRi(pGia, pObj) ? "ri" : "po";
+            pObjName = Gia_ObjCoName( pGia, Gia_ObjCioId(pObj) );
+        }
+        else
+            pType = Gia_ObjIsAnd(pObj) ? "and" : "obj";
+        fprintf( pFile, "%d,%s,%u,%u,%s\n",
+            i,
+            pType,
+            pGia->pPlacement[i].xCoord,
+            pGia->pPlacement[i].yCoord,
+            pObjName ? pObjName : "-" );
+    }
+    fclose( pFile );
+    printf( "Dumped placement coordinates into file \"%s\".\n", Buffer );
+}
+
+/**Function*************************************************************
+
   Synopsis    [Computes dimentions of the graph.]
 
   Description []
@@ -1863,6 +1923,7 @@ ABC_PRT( "Image dump", Abc_Clock() - clk );
             pGia->pPlacement[i].xCoord = p->pPlacement[2*i+0];
             pGia->pPlacement[i].yCoord = p->pPlacement[2*i+1];
         }
+        Gia_ManDumpPlacement( pGia, pGia->pName );
     }
     Emb_ManStop( p );
 }
@@ -1873,4 +1934,3 @@ ABC_PRT( "Image dump", Abc_Clock() - clk );
 
 
 ABC_NAMESPACE_IMPL_END
-
