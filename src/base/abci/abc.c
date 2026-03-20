@@ -22447,6 +22447,17 @@ int Abc_CommandIf( Abc_Frame_t * pAbc, int argc, char ** argv )
             if ( pPars->Epsilon < 0.0 || pPars->Epsilon > 1.0 )
                 goto usage;
             break;
+        case 'P':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-P\" should be followed by a floating point number.\n" );
+                goto usage;
+            }
+            pPars->PlaceWireWeight = (float)atof(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( pPars->PlaceWireWeight < 0.0 )
+                goto usage;
+            break;
         case 'W':
             if ( globalUtilOptind >= argc )
             {
@@ -43478,7 +43489,8 @@ int Abc_CommandAbc9Embed( Abc_Frame_t * pAbc, int argc, char ** argv )
     pPars->fShowImage =  0;
     pPars->fVerbose   =  0;
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "DIrcdlsvh" ) ) != EOF )
+    pPars->pOutPrefix = NULL;
+    while ( ( c = Extra_UtilGetopt( argc, argv, "DIrcdlsvoh" ) ) != EOF )
     {
         switch ( c )
         {
@@ -43522,6 +43534,15 @@ int Abc_CommandAbc9Embed( Abc_Frame_t * pAbc, int argc, char ** argv )
         case 'v':
             pPars->fVerbose ^= 1;
             break;
+        case 'o':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-o\" should be followed by a file prefix.\n" );
+                goto usage;
+            }
+            pPars->pOutPrefix = argv[globalUtilOptind];
+            globalUtilOptind++;
+            break;
         case 'h':
             goto usage;
         default:
@@ -43537,7 +43558,7 @@ int Abc_CommandAbc9Embed( Abc_Frame_t * pAbc, int argc, char ** argv )
     return 0;
 
 usage:
-    Abc_Print( -2, "usage: &embed [-DI <num>] [-rdlscvh]\n" );
+    Abc_Print( -2, "usage: &embed [-DI <num>] [-o <prefix>] [-rdlscvh]\n" );
     Abc_Print( -2, "\t         fast placement based on high-dimensional embedding from\n" );
     Abc_Print( -2, "\t         D. Harel and Y. Koren, \"Graph drawing by high-dimensional\n" );
     Abc_Print( -2, "\t         embedding\", J. Graph Algs & Apps, 2004, Vol 8(2), pp. 195-217\n" );
@@ -43548,6 +43569,7 @@ usage:
     Abc_Print( -2, "\t-d     : toggle dumping placement into a Gnuplot file [default = %s]\n", pPars->fDump? "yes":"no");
     Abc_Print( -2, "\t-l     : toggle dumping Gnuplot for large placement [default = %s]\n", pPars->fDumpLarge? "yes":"no");
     Abc_Print( -2, "\t-s     : toggle showing image if Gnuplot is installed [default = %s]\n", pPars->fShowImage? "yes":"no");
+    Abc_Print( -2, "\t-o str : output prefix for .plt/.csv files [default = current GIA name]\n" );
     Abc_Print( -2, "\t-v     : toggle verbose output [default = %s]\n", pPars->fVerbose? "yes":"no");
     Abc_Print( -2, "\t-h     : print the command usage\n");
     return 1;
@@ -44069,7 +44091,7 @@ int Abc_CommandAbc9If( Abc_Frame_t * pAbc, int argc, char ** argv )
     pPars->pLutLib = (If_LibLut_t *)Abc_FrameReadLibLut();
     pPars->pCellLib = (If_LibCell_t *)Abc_FrameReadLibCell();
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "KCFAGRDEWSJTXYZMqalepmrsdbgxyofuijkztncvwh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "KCFAGRDEPWSJTXYZMqalepmrsdbgxyofuijkztncvwh" ) ) != EOF )
     {
         switch ( c )
         {
@@ -44210,6 +44232,17 @@ int Abc_CommandAbc9If( Abc_Frame_t * pAbc, int argc, char ** argv )
             pPars->Epsilon = (float)atof(argv[globalUtilOptind]);
             globalUtilOptind++;
             if ( pPars->Epsilon < 0.0 || pPars->Epsilon > 1.0 )
+                goto usage;
+            break;
+        case 'P':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-P\" should be followed by a floating point number.\n" );
+                goto usage;
+            }
+            pPars->PlaceWireWeight = (float)atof(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( pPars->PlaceWireWeight < 0.0 )
                 goto usage;
             break;
         case 'W':
@@ -44695,7 +44728,7 @@ usage:
         sprintf(LutSize, "library" );
     else
         sprintf(LutSize, "%d", pPars->nLutSize );
-    Abc_Print( -2, "usage: &if [-KCFAGRTXYZM num] [-DEW float] [-SJ str] [-qarlepmsdbgxyofuijkztnchvw]\n" );
+    Abc_Print( -2, "usage: &if [-KCFAGRTXYZM num] [-DEPW float] [-SJ str] [-qarlepmsdbgxyofuijkztnchvw]\n" );
     Abc_Print( -2, "\t           performs FPGA technology mapping of the network\n" );
     Abc_Print( -2, "\t-K num   : the number of LUT inputs (2 < num < %d) [default = %s]\n", IF_MAX_LUTSIZE+1, LutSize );
     Abc_Print( -2, "\t-C num   : the max number of priority cuts (0 < num < 2^12) [default = %d]\n", pPars->nCutsMax );
@@ -44709,6 +44742,7 @@ usage:
     Abc_Print( -2, "\t-M num   : enables delay-driven decomposition [default = %d]\n", pPars->fDelayOptCell );
     Abc_Print( -2, "\t-D float : sets the delay constraint for the mapping [default = %s]\n", Buffer );
     Abc_Print( -2, "\t-E float : sets epsilon used for tie-breaking [default = %f]\n", pPars->Epsilon );
+    Abc_Print( -2, "\t-P float : sets placement wirelength tie-break weight [default = %f]\n", pPars->PlaceWireWeight );
     Abc_Print( -2, "\t-W float : sets wire delay between adjects LUTs [default = %f]\n", pPars->WireDelay );
     Abc_Print( -2, "\t-S str   : string representing the LUT structure [default = %s]\n", pPars->pLutStruct ? pPars->pLutStruct : "not used" );
     Abc_Print( -2, "\t-J str   : string representing the LUT structure [default = %s]\n", pPars->pLutStruct ? pPars->pLutStruct : "not used" );

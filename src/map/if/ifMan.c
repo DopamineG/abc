@@ -57,6 +57,7 @@ If_Man_t * If_ManStart( If_Par_t * pPars )
     memset( p, 0, sizeof(If_Man_t) );
     p->pPars    = pPars;
     p->fEpsilon = pPars->Epsilon;
+    p->iPlaceRoot = -1;
     // allocate arrays for nodes
     p->vCis     = Vec_PtrAlloc( 100 );
     p->vCos     = Vec_PtrAlloc( 100 );
@@ -446,6 +447,8 @@ void If_ManStop( If_Man_t * p )
     Vec_PtrFree( p->vCos );
     Vec_PtrFree( p->vObjs );
     Vec_PtrFree( p->vTemp );
+    ABC_FREE( p->pPlaceX );
+    ABC_FREE( p->pPlaceY );
     Vec_IntFreeP( &p->vCover );
     Vec_IntFreeP( &p->vArray );
     Vec_WrdFreeP( &p->vAnds );
@@ -921,4 +924,3 @@ void If_ManSetupSetAll( If_Man_t * p, int nCrossCut )
 
 
 ABC_NAMESPACE_IMPL_END
-

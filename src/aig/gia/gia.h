@@ -289,6 +289,7 @@ struct Emb_Par_t_
     int            fDumpLarge;    // dump Gnuplot file for large benchmarks
     int            fShowImage;    // shows image if Gnuplot is installed
     int            fVerbose;      // verbose flag  
+    char *         pOutPrefix;    // output prefix for placement artifacts
 };
 
 
@@ -1880,4 +1881,3 @@ ABC_NAMESPACE_HEADER_END
 ////////////////////////////////////////////////////////////////////////
 ///                       END OF FILE                                ///
 ////////////////////////////////////////////////////////////////////////
-

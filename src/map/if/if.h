@@ -157,6 +157,7 @@ struct If_Par_t_
     char *             pLutStruct;    // LUT structure
     int                fEnableStructN;// LUT structure using a new method
     float              WireDelay;     // wire delay
+    float              PlaceWireWeight; // placement-aware wirelength tie-break weight
     // internal parameters
     int                fSkipCutFilter;// skip cut filter
     int                fAreaOnly;     // area only mode
@@ -238,6 +239,9 @@ struct If_Man_t_
     int                fNextRound;    // set to 1 after the first round
     int                nChoices;      // the number of choice nodes
     Vec_Int_t *        vSwitching;    // switching activity of each node
+    int *              pPlaceX;       // x-coordinate for each object
+    int *              pPlaceY;       // y-coordinate for each object
+    int                iPlaceRoot;    // current root object used in cut comparison
     int                pPerm[3][IF_MAX_LUTSIZE]; // permutations
     unsigned           uSharedMask;   // mask of shared variables
     int                nShared;       // the number of shared variables
@@ -753,4 +757,3 @@ ABC_NAMESPACE_HEADER_END
 ////////////////////////////////////////////////////////////////////////
 ///                       END OF FILE                                ///
 ////////////////////////////////////////////////////////////////////////
-

@@ -19,6 +19,7 @@
 ***********************************************************************/
 
 #include <math.h>
+#include <sys/stat.h>
 #include "gia.h"
 #include "aig/ioa/ioa.h"
 
@@ -42,6 +43,44 @@ ABC_NAMESPACE_IMPL_START
 
 #define GIA_PLACE_SIZE 0x7fff 
 // objects will be placed in box [0, GIA_PLACE_SIZE] x [0, GIA_PLACE_SIZE]
+
+static inline char * Emb_FileNameAppend( char * pBase, char * pSuffix )
+{
+    static char Buffer[1000];
+    char * pDot;
+    strcpy( Buffer, pBase );
+    if ( (pDot = strrchr( Buffer, '.' )) )
+        *pDot = 0;
+    strcat( Buffer, pSuffix );
+    return Buffer;
+}
+
+static inline int Emb_CheckOutputDir( char * pFileName )
+{
+    char Buffer[1000];
+    char * pSlash;
+    struct stat St;
+    strcpy( Buffer, pFileName );
+    pSlash = strrchr( Buffer, '/' );
+#ifdef WIN32
+    {
+        char * pBack = strrchr( Buffer, '\\' );
+        if ( pBack && (!pSlash || pBack > pSlash) )
+            pSlash = pBack;
+    }
+#endif
+    if ( pSlash == NULL )
+        return 1;
+    *pSlash = 0;
+    if ( Buffer[0] == 0 )
+        return 1;
+    if ( stat(Buffer, &St) != 0 || !S_ISDIR(St.st_mode) )
+    {
+        printf( "Output directory \"%s\" does not exist.\n", Buffer );
+        return 0;
+    }
+    return 1;
+}
 
 typedef float  Emb_Dat_t;
 
@@ -1707,8 +1746,15 @@ void Emb_ManDumpGnuplot( Emb_Man_t * p, char * pName, int fDumpLarge, int fShowI
         printf( "Emb_ManDumpGnuplot(): Placement is not available.\n" );
         return;
     }
-    sprintf( Buffer, "%s%s", pDirectory, Gia_FileNameGenericAppend(pName, ".plt") ); 
+    sprintf( Buffer, "%s%s", pDirectory, Emb_FileNameAppend(pName, ".plt") );
+    if ( !Emb_CheckOutputDir(Buffer) )
+        return;
     pFile = fopen( Buffer, "w" );
+    if ( pFile == NULL )
+    {
+        printf( "Emb_ManDumpGnuplot(): Cannot open output file \"%s\".\n", Buffer );
+        return;
+    }
     fprintf( pFile, "# This Gnuplot file was produced by ABC on %s\n", Ioa_TimeStamp() );
     fprintf( pFile, "\n" );
     fprintf( pFile, "set nokey\n" );
@@ -1717,7 +1763,7 @@ void Emb_ManDumpGnuplot( Emb_Man_t * p, char * pName, int fDumpLarge, int fShowI
     {
 //    fprintf( pFile, "set terminal postscript\n" );
     fprintf( pFile, "set terminal gif font \'arial\' 10 size 800,600 xffffff x000000 x000000 x000000\n" );
-    fprintf( pFile, "set output \'%s\'\n", Gia_FileNameGenericAppend(pName, ".gif") );
+    fprintf( pFile, "set output \'%s\'\n", Emb_FileNameAppend(pName, ".gif") );
     fprintf( pFile, "\n" );
     }
     fprintf( pFile, "set title \"%s :  PI = %d   PO = %d   FF = %d   Node = %d   Obj = %d  HPWL = %.2e\\n", 
@@ -1801,7 +1847,9 @@ void Gia_ManDumpPlacement( Gia_Man_t * pGia, char * pName )
         printf( "Gia_ManDumpPlacement(): Placement is not available.\n" );
         return;
     }
-    sprintf( Buffer, "%s", Gia_FileNameGenericAppend(pName, ".csv") );
+    sprintf( Buffer, "%s", Emb_FileNameAppend(pName, ".csv") );
+    if ( !Emb_CheckOutputDir(Buffer) )
+        return;
     pFile = fopen( Buffer, "w" );
     if ( pFile == NULL )
     {
@@ -1908,7 +1956,7 @@ ABC_PRT( "Refinement", Abc_Clock() - clk );
     if ( (pPars->fDump || pPars->fDumpLarge) && pPars->nSols == 2 )
     {
 clk = Abc_Clock();
-        Emb_ManDumpGnuplot( p, pGia->pName, pPars->fDumpLarge, pPars->fShowImage );
+        Emb_ManDumpGnuplot( p, pPars->pOutPrefix ? pPars->pOutPrefix : pGia->pName, pPars->fDumpLarge, pPars->fShowImage );
 if ( pPars->fVerbose )
 ABC_PRT( "Image dump", Abc_Clock() - clk );
     }
@@ -1923,7 +1971,7 @@ ABC_PRT( "Image dump", Abc_Clock() - clk );
             pGia->pPlacement[i].xCoord = p->pPlacement[2*i+0];
             pGia->pPlacement[i].yCoord = p->pPlacement[2*i+1];
         }
-        Gia_ManDumpPlacement( pGia, pGia->pName );
+        Gia_ManDumpPlacement( pGia, pPars->pOutPrefix ? pPars->pOutPrefix : pGia->pName );
     }
     Emb_ManStop( p );
 }

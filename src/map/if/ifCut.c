@@ -31,6 +31,40 @@ ABC_NAMESPACE_IMPL_START
 ///                     FUNCTION DEFINITIONS                         ///
 ////////////////////////////////////////////////////////////////////////
 
+static inline int If_CutPlaceWireCost( If_Man_t * p, If_Cut_t * pCut )
+{
+    int i, iObj, iMinX, iMaxX, iMinY, iMaxY;
+    if ( p->pPars->PlaceWireWeight <= 0.0 || p->pPlaceX == NULL || p->pPlaceY == NULL || p->iPlaceRoot < 0 )
+        return 0;
+    iMinX = iMaxX = p->pPlaceX[p->iPlaceRoot];
+    iMinY = iMaxY = p->pPlaceY[p->iPlaceRoot];
+    for ( i = 0; i < (int)pCut->nLeaves; i++ )
+    {
+        iObj = pCut->pLeaves[i];
+        iMinX = Abc_MinInt( iMinX, p->pPlaceX[iObj] );
+        iMaxX = Abc_MaxInt( iMaxX, p->pPlaceX[iObj] );
+        iMinY = Abc_MinInt( iMinY, p->pPlaceY[iObj] );
+        iMaxY = Abc_MaxInt( iMaxY, p->pPlaceY[iObj] );
+    }
+    return iMaxX - iMinX + iMaxY - iMinY;
+}
+
+static inline int If_ManSortComparePlace( If_Man_t * p, If_Cut_t * pC0, If_Cut_t * pC1 )
+{
+    float Weight;
+    int Cost0, Cost1;
+    if ( p->pPars->PlaceWireWeight <= 0.0 || p->pPlaceX == NULL || p->pPlaceY == NULL || p->iPlaceRoot < 0 )
+        return 0;
+    Weight = p->pPars->PlaceWireWeight;
+    Cost0 = If_CutPlaceWireCost( p, pC0 );
+    Cost1 = If_CutPlaceWireCost( p, pC1 );
+    if ( Weight * Cost0 < Weight * Cost1 )
+        return -1;
+    if ( Weight * Cost0 > Weight * Cost1 )
+        return 1;
+    return 0;
+}
+
 /**Function*************************************************************
 
   Synopsis    [Check correctness of cuts.]
@@ -531,7 +565,7 @@ static inline int If_ManSortCompare( If_Man_t * p, If_Cut_t * pC0, If_Cut_t * pC
                 return -1;
             if ( pC0->Delay > pC1->Delay + p->fEpsilon )
                 return 1;
-            return 0;
+            return If_ManSortComparePlace( p, pC0, pC1 );
         }
         if ( p->SortMode == 0 ) // delay
         {
@@ -555,7 +589,7 @@ static inline int If_ManSortCompare( If_Man_t * p, If_Cut_t * pC0, If_Cut_t * pC
                 return -1;
             if ( pC0->Edge > pC1->Edge + p->fEpsilon )
                 return 1;
-            return 0;
+            return If_ManSortComparePlace( p, pC0, pC1 );
         }
         assert( p->SortMode == 2 ); // delay old, exact area
         if ( pC0->Delay < pC1->Delay - p->fEpsilon )
@@ -578,7 +612,7 @@ static inline int If_ManSortCompare( If_Man_t * p, If_Cut_t * pC0, If_Cut_t * pC
             return -1;
         if ( pC0->nLeaves > pC1->nLeaves )
             return 1;
-        return 0;
+        return If_ManSortComparePlace( p, pC0, pC1 );
     } 
     else  // regular
     {
@@ -608,7 +642,7 @@ static inline int If_ManSortCompare( If_Man_t * p, If_Cut_t * pC0, If_Cut_t * pC
                 return -1;
             if ( pC0->fUseless > pC1->fUseless )
                 return 1;
-            return 0;
+            return If_ManSortComparePlace( p, pC0, pC1 );
         }
         if ( p->SortMode == 0 ) // delay
         {
@@ -636,7 +670,7 @@ static inline int If_ManSortCompare( If_Man_t * p, If_Cut_t * pC0, If_Cut_t * pC
                 return -1;
             if ( pC0->fUseless > pC1->fUseless )
                 return 1;
-            return 0;
+            return If_ManSortComparePlace( p, pC0, pC1 );
         }
         assert( p->SortMode == 2 ); // delay old
         if ( pC0->Delay < pC1->Delay - p->fEpsilon )
@@ -663,7 +697,7 @@ static inline int If_ManSortCompare( If_Man_t * p, If_Cut_t * pC0, If_Cut_t * pC
             return -1;
         if ( pC0->nLeaves > pC1->nLeaves )
             return 1;
-        return 0;
+        return If_ManSortComparePlace( p, pC0, pC1 );
     }
 }
 
@@ -1558,4 +1592,3 @@ int If_CutFilter2( If_Man_t * p, If_Obj_t * pNode, If_Cut_t * pCut )
 
 
 ABC_NAMESPACE_IMPL_END
-

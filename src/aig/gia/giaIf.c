@@ -81,6 +81,7 @@ void Gia_ManSetIfParsDefault( void * pp )
     p->fCutMin     =  0;
     p->fVerbose    =  0;
     p->pLutStruct  =  NULL;
+    p->PlaceWireWeight = 0.0;
     // internal parameters
     p->fTruth      =  0;
     p->nLatchesCi  =  0;
@@ -904,6 +905,16 @@ If_Man_t * Gia_ManToIf( Gia_Man_t * p, If_Par_t * pPars )
     // start the mapping manager and set its parameters
     pIfMan = If_ManStart( pPars );
     pIfMan->pName = Abc_UtilStrsav( Gia_ManName(p) );
+    if ( pPars->PlaceWireWeight > 0.0 && p->pPlacement != NULL )
+    {
+        pIfMan->pPlaceX = ABC_ALLOC( int, Gia_ManObjNum(p) );
+        pIfMan->pPlaceY = ABC_ALLOC( int, Gia_ManObjNum(p) );
+        for ( i = 0; i < Gia_ManObjNum(p); i++ )
+        {
+            pIfMan->pPlaceX[i] = p->pPlacement[i].xCoord;
+            pIfMan->pPlaceY[i] = p->pPlacement[i].yCoord;
+        }
+    }
     // print warning about excessive memory usage
     if ( 1.0 * Gia_ManObjNum(p) * pIfMan->nObjBytes / (1<<30) > 1.0 )
         printf( "Warning: The mapper will allocate %.1f GB for to represent the subject graph with %d AIG nodes.\n", 
