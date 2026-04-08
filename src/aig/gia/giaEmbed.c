@@ -124,6 +124,7 @@ struct Emb_Man_t_
     float **       pEigen;           // the first several eigen values of the matrix
     float *        pSols;            // solutions to the problem nObjs * nSols;
     unsigned short*pPlacement;       // (x,y) coordinates for each cell
+    unsigned char* pIoSide;          // assigned border side for PI/PO objects
 };
 
 static inline int         Emb_ManRegNum( Emb_Man_t * p )                              { return p->nRegs;                                    }
@@ -141,8 +142,8 @@ static inline Emb_Obj_t * Emb_ManCo( Emb_Man_t * p, int i )                     
 static inline int         Emb_ObjIsTerm( Emb_Obj_t * pObj )                           { return pObj->fCi || pObj->fCo;                      } 
 static inline int         Emb_ObjIsCi( Emb_Obj_t * pObj )                             { return pObj->fCi;                                   } 
 static inline int         Emb_ObjIsCo( Emb_Obj_t * pObj )                             { return pObj->fCo;                                   } 
-//static inline int         Emb_ObjIsPi( Emb_Obj_t * pObj )                             { return pObj->fCi && pObj->nFanins == 0;             } 
-//static inline int         Emb_ObjIsPo( Emb_Obj_t * pObj )                             { return pObj->fCo && pObj->nFanouts == 0;            } 
+static inline int         Emb_ObjIsPi( Emb_Obj_t * pObj )                             { return pObj->fCi && pObj->nFanins == 0;             } 
+static inline int         Emb_ObjIsPo( Emb_Obj_t * pObj )                             { return pObj->fCo && pObj->nFanouts == 1;            } 
 static inline int         Emb_ObjIsNode( Emb_Obj_t * pObj )                           { return!Emb_ObjIsTerm(pObj) && pObj->nFanins > 0;    } 
 //static inline int         Emb_ObjIsConst0( Emb_Obj_t * pObj )                         { return!Emb_ObjIsTerm(pObj) && pObj->nFanins == 0;   } 
 
@@ -173,6 +174,74 @@ static inline float *     Emb_ManSol( Emb_Man_t * p, int v )                    
     for ( i = 0; (i < (int)pObj->nFanins) && (pNext = Emb_ObjFanin(pObj,i)); i++ )
 #define Emb_ObjForEachFanout( pObj, pNext, i )        \
     for ( i = 0; (i < (int)pObj->nFanouts) && (pNext = Emb_ObjFanout(pObj,i)); i++ )
+
+enum { EMB_SIDE_NONE = 0, EMB_SIDE_BOTTOM, EMB_SIDE_TOP, EMB_SIDE_LEFT, EMB_SIDE_RIGHT };
+
+static inline int Emb_ManFindClosestBorderSide( int x, int y )
+{
+    int DistLeft, DistRight, DistBottom, DistTop;
+    DistLeft   = x;
+    DistRight  = GIA_PLACE_SIZE - x;
+    DistBottom = y;
+    DistTop    = GIA_PLACE_SIZE - y;
+    if ( DistBottom <= DistTop && DistBottom <= DistLeft && DistBottom <= DistRight )
+        return EMB_SIDE_BOTTOM;
+    if ( DistTop <= DistLeft && DistTop <= DistRight )
+        return EMB_SIDE_TOP;
+    if ( DistLeft <= DistRight )
+        return EMB_SIDE_LEFT;
+    return EMB_SIDE_RIGHT;
+}
+
+void Emb_ManAssignBorderIo( Emb_Man_t * p )
+{
+    Emb_Obj_t * pObj;
+    int i;
+    if ( p->pPlacement == NULL )
+        return;
+    if ( p->pIoSide == NULL )
+        p->pIoSide = ABC_CALLOC( unsigned char, p->nObjs );
+    Emb_ManForEachObj( p, pObj, i )
+    {
+        unsigned short * pPlace;
+        if ( !Emb_ObjIsPi(pObj) && !Emb_ObjIsPo(pObj) )
+            continue;
+        pPlace = p->pPlacement + 2 * pObj->Value;
+        p->pIoSide[pObj->Value] = (unsigned char)Emb_ManFindClosestBorderSide( pPlace[0], pPlace[1] );
+    }
+}
+
+static inline void Emb_ManProjectBorderObj( Emb_Man_t * p, Emb_Obj_t * pObj )
+{
+    unsigned short * pPlace;
+    int Side;
+    if ( !Emb_ObjIsPi(pObj) && !Emb_ObjIsPo(pObj) )
+        return;
+    if ( p->pIoSide == NULL )
+        return;
+    pPlace = p->pPlacement + 2 * pObj->Value;
+    Side = p->pIoSide[pObj->Value];
+    if ( Side == EMB_SIDE_NONE )
+        Side = Emb_ManFindClosestBorderSide( pPlace[0], pPlace[1] );
+    if ( Side == EMB_SIDE_BOTTOM )
+        pPlace[1] = 0;
+    else if ( Side == EMB_SIDE_TOP )
+        pPlace[1] = GIA_PLACE_SIZE;
+    else if ( Side == EMB_SIDE_LEFT )
+        pPlace[0] = 0;
+    else if ( Side == EMB_SIDE_RIGHT )
+        pPlace[0] = GIA_PLACE_SIZE;
+}
+
+void Emb_ManProjectBorderIo( Emb_Man_t * p )
+{
+    Emb_Obj_t * pObj;
+    int i;
+    if ( p->pPlacement == NULL )
+        return;
+    Emb_ManForEachObj( p, pObj, i )
+        Emb_ManProjectBorderObj( p, pObj );
+}
 
 ////////////////////////////////////////////////////////////////////////
 ///                     FUNCTION DEFINITIONS                         ///
@@ -692,6 +761,7 @@ void Emb_ManStop( Emb_Man_t * p )
     Vec_IntFree( p->vCis );
     Vec_IntFree( p->vCos );
     ABC_FREE( p->pPlacement );
+    ABC_FREE( p->pIoSide );
     ABC_FREE( p->pVecs );
     ABC_FREE( p->pSols );
     ABC_FREE( p->pMatr );
@@ -1509,6 +1579,8 @@ void Emb_ManDerivePlacement( Emb_Man_t * p, int nSols )
         p->pPlacement[2*pPerm0[k]+0] = (unsigned short)(int)(1.0 * k * GIA_PLACE_SIZE / p->nObjs);
         p->pPlacement[2*pPerm1[k]+1] = (unsigned short)(int)(1.0 * k * GIA_PLACE_SIZE / p->nObjs);
     }
+    Emb_ManAssignBorderIo( p );
+    Emb_ManProjectBorderIo( p );
     ABC_FREE( pPerm0 );
     ABC_FREE( pPerm1 );
 }
@@ -1618,6 +1690,7 @@ void Emb_ManPlacementRefine( Emb_Man_t * p, int nIters, int fVerbose )
             p->pPlacement[2*pPermX[k]+0] = (unsigned short)(int)(1.0 * k * GIA_PLACE_SIZE / p->nObjs);
             p->pPlacement[2*pPermY[k]+1] = (unsigned short)(int)(1.0 * k * GIA_PLACE_SIZE / p->nObjs);
         }
+        Emb_ManProjectBorderIo( p );
         ABC_FREE( pPermX );
         ABC_FREE( pPermY );
         // evaluate cost
